@@ -10,6 +10,7 @@ random.seed(time.time())
 
 CurrentMode = 1
 CurrentlyUsing = []
+PreviousIndex = 0
 
 
 def OpenFile():
@@ -66,8 +67,15 @@ def GetMode():
 
 
 def GetRandomItemInList(list):
+    global PreviousIndex
+
     Length = len(list)
-    Index = random.randint(0, Length-1)
+    Index = PreviousIndex
+
+    while (Index == PreviousIndex):
+        Index = random.randint(0, Length-1)
+    
+    PreviousIndex = Index
 
     return list[Index]
 
