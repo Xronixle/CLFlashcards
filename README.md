@@ -1,5 +1,5 @@
 # CLFlashcards
-CLFlashlcards is a flashcards program meant to be ran in a command-line interface (CLI).
+CLFlashcards is a flashcards program meant to be ran in a command-line interface (CLI).
 
 This entire project was made in around 2 hours for personal use, however I wanted to put it on Github mainly so I could retrieve a copy of it on other devices if necessary.
 The main benefit of this program is that it can be used offline on a computer instead of needing an internet connection for something like Quizlet.
