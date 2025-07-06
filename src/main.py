@@ -1,11 +1,7 @@
 import Modules.CommandLineHandler as CLI
 import Modules.FileReader as FileReader
-
-import random
-import time
-
-
-random.seed(time.time())
+import Modules.GuessHandler as Guesser
+import Modules.Randomizer as Random
 
 
 CurrentMode = 1
@@ -24,15 +20,33 @@ def OpenFile():
     return ParsedContents
 
 
-def GetCategory(fileContents: dict):
-    Categories = fileContents.keys()
+def GetValueInDictionary(key, dictionary):
+    Found = dictionary.get(key)
+
+    if (Found != None):
+        return Found, key
+    
+    ConvertedToLower = {}
+
+    for convert in dictionary.keys():
+        lowered = str.lower(convert)
+        ConvertedToLower[lowered] = convert
+
+    KeyFound = ConvertedToLower.get(key)
+
+    if (KeyFound != None):
+        return dictionary.get(KeyFound), KeyFound
+
+
+def GetCategory(fileContents):
+    Categories = list(fileContents.keys())
     CategoryCount = len(Categories)
 
     CategoryListStr = ", ".join(Categories)
-    CategoryChosen = CLI.GetInput(f"Found {CategoryCount} categorie(s) to chose from:\n{CategoryListStr}\nIf you have no preference, you can input \"All\" to ignore the category type.")
+    CategoryChosen = CLI.GetInput(f"Found {CategoryCount} categorie(s) to chose from:\n{CategoryListStr}\nIf you have no preference, you can input \"All\" to ignore the category type.\nSeparate categories by commas (,) to use multiple of your choice.")
 
-    Using = []
     if (CategoryChosen.lower() == "all"):
+        Using = []
         print("Chose all categories.")
 
         for cat, data in fileContents.items():
@@ -42,15 +56,38 @@ def GetCategory(fileContents: dict):
 
         return Using
     
-    if (fileContents[CategoryChosen] != None):
-        Using = fileContents[CategoryChosen]
-    else:
-        print("The chosen category wasn't found. Please re-run the script to try again.")
+    Combined = []
+    Cats = []
+
+    Split = str.split(CategoryChosen, ",")
+    Len = len(Split)
+
+    for cat in Split:
+        if int(cat):
+            Fixed = Categories[int(cat) - 1]
+            Found = fileContents.get(Fixed)
+        else:
+            Found, Fixed = GetValueInDictionary(cat, fileContents)
+
+        if (Found == None):
+            print(f"No category found called {cat}.")
+            continue
+
+        for x in Found:
+            if Len > 1:
+                x.update({"Category": Fixed})
+            
+            Combined.append(x)
+
+        Cats.append(Fixed)
+
+    if (len(Combined) <= 0):
+        print("Failed to find the categories given. Please re-run the script.")
         return
 
-    print(f"Chose {CategoryChosen}.")
+    print(f"Chose {", ".join(Cats)}.")
 
-    return Using
+    return Random.RandomizeList(Combined, Random.GetKey())
 
 
 def GetMode():
@@ -66,25 +103,37 @@ def GetMode():
     return 1
 
 
-def GetRandomItemInList(list):
+def GetGuessingLimit():
+    AmountStr = CLI.GetInput("How many total guesses do you want per question? Input a number larger than 0.")
+
+    Converted = max(abs(int(AmountStr)), 1)
+
+    Guesser.ChangeGuessLimit(Converted)
+
+    HintsOn = CLI.GetInput("Do you want hints? (Y/N)")
+
+    Guesser.ChangeHintsEnabled(HintsOn.lower() == "y")
+
+
+def GetRandomItemInList():
     global PreviousIndex
+    global CurrentlyUsing
 
-    Length = len(list)
-    Index = PreviousIndex
-
-    while (Index == PreviousIndex):
-        Index = random.randint(0, Length-1)
+    if (PreviousIndex > len(CurrentlyUsing) - 1):
+        CurrentlyUsing = Random.RandomizeList(CurrentlyUsing, Random.GetKey())
+        PreviousIndex = 0
     
-    PreviousIndex = Index
+    New = CurrentlyUsing[PreviousIndex]
+    PreviousIndex += 1
 
-    return list[Index]
+    return New
 
 
 def Next():
-    Message, BufferCount = CLI.Prettify("\nAfter attempting to answer, input \"next\" or \"n\" to get the next random card or anything at all to stop the program.")
+    Message, BufferCount = CLI.Prettify("\nWhen you're done, input \"exit\" or \"e\" to stop the program.")
     CLI.ClearCLI(Message)
 
-    ChosenData = GetRandomItemInList(CurrentlyUsing)
+    ChosenData = GetRandomItemInList()
 
     QuestionKey = CurrentMode == 1 and "Question" or "Answer"
     AnswerKey = CurrentMode == 1 and "Answer" or "Question"
@@ -95,11 +144,16 @@ def Next():
     if (Category != None):
         ShownMessage = f"Category: {Category}\nInfo: {ShownMessage}"
 
-    GivenAnswer = CLI.GetInput(ShownMessage)
+    #GivenAnswer = CLI.GetInput(ShownMessage)
     ActualAnswer = ChosenData[AnswerKey]
     Source = ChosenData.get("Source") or "No source found."
 
-    if (GivenAnswer.lower() == ActualAnswer.lower()):
+    Prompt, c = CLI.Prettify(ShownMessage)
+    print("\n" + Prompt + "\n")
+
+    Correct = Guesser.StartGuessing(ActualAnswer)
+
+    if (Correct):
         print("\nCorrect!")
     else:
         print(f"\nThe correct answer is:\n{ActualAnswer}")
@@ -124,6 +178,7 @@ def MainFunction():
         return
     
     CurrentMode = GetMode()
+    GetGuessingLimit()
 
     CLI.GetInput("When you're ready, input anything into the console in order to start using the flashcards.")
 
@@ -132,7 +187,7 @@ def MainFunction():
     while (ContinueGoing == True):
         Given = Next()
 
-        if (Given.lower() != "next" and Given.lower() != "n"):
+        if (Given.lower() == "exit") or (Given.lower() == "e"):
             ContinueGoing = False
 
     print("Stopping the program.")
